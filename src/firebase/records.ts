@@ -26,23 +26,24 @@ function toRecord(docSnap: DocumentSnapshot): ServiceRecord {
   }
 }
 
-/** 시술 기록 추가 + 고객의 lastVisitDate 갱신 */
-export async function addRecord(data: Omit<ServiceRecord, 'id'>) {
-  const docRef = await addDoc(collection(db, COLLECTION), data)
+/** 시술 기록 추가 (사용자별) + lastVisitDate 갱신 */
+export async function addRecord(data: Omit<ServiceRecord, 'id'>, userId: string) {
+  const docRef = await addDoc(collection(db, COLLECTION), { ...data, userId })
   await updateCustomerLastVisit(data.customerId, data.date)
   return docRef.id
 }
 
-/** 전체 시술 기록 실시간 구독 (날짜 내림차순, 클라이언트 정렬) */
-export function subscribeAllRecords(callback: (records: ServiceRecord[]) => void): Unsubscribe {
-  return onSnapshot(collection(db, COLLECTION), (snapshot) => {
+/** 사용자의 전체 시술 기록 실시간 구독 (날짜 내림차순) */
+export function subscribeAllRecords(userId: string, callback: (records: ServiceRecord[]) => void): Unsubscribe {
+  const q = query(collection(db, COLLECTION), where('userId', '==', userId))
+  return onSnapshot(q, (snapshot) => {
     const records = snapshot.docs.map(toRecord)
     records.sort((a, b) => b.date.getTime() - a.date.getTime())
     callback(records)
   })
 }
 
-/** 특정 고객의 시술 기록 실시간 구독 (날짜 내림차순, 클라이언트 정렬) */
+/** 특정 고객의 시술 기록 실시간 구독 (날짜 내림차순) */
 export function subscribeRecordsByCustomer(
   customerId: string,
   callback: (records: ServiceRecord[]) => void

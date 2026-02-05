@@ -1,21 +1,25 @@
 import { useState, useEffect } from 'react'
 import { addCustomer, subscribeCustomers, subscribeCustomer } from '../firebase/customers'
+import { useAuth } from '../context/AuthContext'
 import type { Customer } from '../types'
 
 export function useCustomers() {
+  const { user } = useAuth()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsubscribe = subscribeCustomers((data) => {
+    if (!user) return
+    const unsubscribe = subscribeCustomers(user.uid, (data) => {
       setCustomers(data)
       setLoading(false)
     })
     return unsubscribe
-  }, [])
+  }, [user])
 
   const add = async (data: Omit<Customer, 'id' | 'createdAt'>) => {
-    await addCustomer(data)
+    if (!user) return
+    await addCustomer(data, user.uid)
   }
 
   return { customers, loading, addCustomer: add }

@@ -1,10 +1,12 @@
 import { useMemo } from 'react'
 import { isToday, isSameMonth, format } from 'date-fns'
-import { Loader2 } from 'lucide-react'
+import { Loader2, LogOut } from 'lucide-react'
 import { useCustomers } from '../../hooks/useCustomers'
 import { useAllRecords } from '../../hooks/useRecords'
+import { useAuth } from '../../context/AuthContext'
 
 export default function Home() {
+  const { logout } = useAuth()
   const { customers, loading: customersLoading } = useCustomers()
   const { records, loading: recordsLoading } = useAllRecords()
 
@@ -30,8 +32,18 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
       <div className="bg-white px-4 pt-6 pb-5">
-        <h1 className="text-2xl font-bold text-gray-800">MANE</h1>
-        <p className="text-sm text-gray-400 mt-0.5">미용실 관리</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">MANE</h1>
+            <p className="text-sm text-gray-400 mt-0.5">미용실 관리</p>
+          </div>
+          <button
+            onClick={logout}
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition"
+          >
+            <LogOut size={20} />
+          </button>
+        </div>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 space-y-4">
