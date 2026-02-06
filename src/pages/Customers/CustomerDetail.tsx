@@ -1,14 +1,17 @@
 import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, X, Phone, Loader2, Image as ImageIcon, Crown } from 'lucide-react'
+import { ArrowLeft, Plus, X, Phone, Loader2, Image as ImageIcon, Crown, Edit, User as UserIcon } from 'lucide-react'
 import { format } from 'date-fns'
-import type { ServiceMenu, ServiceRecord } from '../../types'
+import type { ServiceMenu, ServiceRecord, Customer } from '../../types'
 import { useCustomer } from '../../hooks/useCustomers'
 import { useRecords } from '../../hooks/useRecords'
 import { useServices } from '../../hooks/useServices'
 import { useAuth } from '../../context/AuthContext'
 import { usePlan } from '../../hooks/usePlan'
+import { useToast } from '../../context/ToastContext'
 import { uploadServicePhoto } from '../../firebase/storage'
+import { updateCustomer } from '../../firebase/customers'
+import { updateRecord, deleteRecord } from '../../firebase/records'
 import UpgradeModal from '../../components/UpgradeModal'
 
 // --- 모달: 시술 기록 추가 ---
@@ -222,6 +225,254 @@ function AddRecordModal({ customerId, menus, isPremium, onClose, onAdd, onUpgrad
   )
 }
 
+// --- 모달: 고객 정보 수정 ---
+interface EditCustomerModalProps {
+  customer: Customer
+  onClose: () => void
+  onSave: (data: Partial<Pick<Customer, 'name' | 'phone' | 'memo'>>) => Promise<void>
+}
+
+function EditCustomerModal({ customer, onClose, onSave }: EditCustomerModalProps) {
+  const [name, setName] = useState(customer.name)
+  const [phone, setPhone] = useState(customer.phone)
+  const [memo, setMemo] = useState(customer.memo || '')
+  const [saving, setSaving] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!name.trim() || !phone.trim()) return
+    setSaving(true)
+    try {
+      await onSave({
+        name: name.trim(),
+        phone: phone.trim(),
+        memo: memo.trim() || undefined,
+      })
+      onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-800">고객 정보 수정</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
+        </div>
+
+        <form action={handleSubmit} className="px-6 py-5 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1.5">이름 *</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1.5">전화번호 *</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1.5">메모 (특이사항)</label>
+            <textarea
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-violet-400"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              disabled={!name.trim() || !phone.trim() || saving}
+              className="flex-1 py-2.5 rounded-xl bg-violet-500 text-white text-sm font-medium disabled:opacity-40 hover:bg-violet-600 flex items-center justify-center gap-2"
+            >
+              {saving && <Loader2 size={16} className="animate-spin" />}
+              저장
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// --- 모달: 시술 기록 수정 ---
+interface EditRecordModalProps {
+  record: ServiceRecord
+  menus: ServiceMenu[]
+  onClose: () => void
+  onSave: (id: string, data: Partial<ServiceRecord>) => Promise<void>
+  onDelete: (id: string) => Promise<void>
+}
+
+function EditRecordModal({ record, menus, onClose, onSave, onDelete }: EditRecordModalProps) {
+  const [date, setDate] = useState(format(record.date, 'yyyy-MM-dd'))
+  const [menuId, setMenuId] = useState(record.menuId)
+  const [price, setPrice] = useState(String(record.price))
+  const [memo, setMemo] = useState(record.memo || '')
+  const [saving, setSaving] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  const selectedMenu = menus.find((m) => m.id === menuId)
+
+  const handleSubmit = async () => {
+    if (!menuId || Number(price) <= 0 || !selectedMenu) return
+    setSaving(true)
+    try {
+      const [year, month, day] = date.split('-').map(Number)
+      await onSave(record.id, {
+        menuId,
+        menuName: selectedMenu.name,
+        price: Number(price),
+        date: new Date(year, month - 1, day),
+        memo: memo.trim() || undefined,
+      })
+      onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    setSaving(true)
+    try {
+      await onDelete(record.id)
+      onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-800">시술 기록 수정</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
+        </div>
+
+        {showDeleteConfirm ? (
+          <div className="px-6 py-5">
+            <p className="text-sm text-gray-700 mb-4 text-center">정말 삭제하시겠습니까?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={saving}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-medium hover:bg-red-600 disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {saving && <Loader2 size={16} className="animate-spin" />}
+                삭제
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form action={handleSubmit} className="px-6 py-5 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1.5">날짜 *</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1.5">시술 메뉴 *</label>
+              <select
+                value={menuId}
+                onChange={(e) => {
+                  setMenuId(e.target.value)
+                  const menu = menus.find((m) => m.id === e.target.value)
+                  if (menu) setPrice(String(menu.price))
+                }}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400"
+              >
+                {menus.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.price.toLocaleString()}원)
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1.5">가격 (원) *</label>
+              <input
+                type="number"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                min="1"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1.5">메모</label>
+              <textarea
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-violet-400"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="px-4 py-2.5 rounded-xl border border-red-200 text-sm font-medium text-red-600 hover:bg-red-50"
+              >
+                삭제
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                disabled={!menuId || Number(price) <= 0 || saving}
+                className="flex-1 py-2.5 rounded-xl bg-violet-500 text-white text-sm font-medium disabled:opacity-40 hover:bg-violet-600 flex items-center justify-center gap-2"
+              >
+                {saving && <Loader2 size={16} className="animate-spin" />}
+                저장
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // --- 메인: 고객 상세 페이지 ---
 export default function CustomerDetail() {
   const { id } = useParams<{ id: string }>()
@@ -231,9 +482,39 @@ export default function CustomerDetail() {
   const { records, loading: recordsLoading, addRecord } = useRecords(id!)
   const { menus } = useServices()
   const { plan } = usePlan()
+  const toast = useToast()
 
   const [modalOpen, setModalOpen] = useState(false)
+  const [editCustomerModalOpen, setEditCustomerModalOpen] = useState(false)
+  const [editingRecord, setEditingRecord] = useState<ServiceRecord | null>(null)
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
+
+  const handleUpdateCustomer = async (data: Partial<Pick<Customer, 'name' | 'phone' | 'memo'>>) => {
+    try {
+      await updateCustomer(id!, data)
+      toast.success('고객 정보가 수정되었습니다.')
+    } catch (error) {
+      toast.error('수정 실패. 다시 시도해주세요.')
+    }
+  }
+
+  const handleUpdateRecord = async (recordId: string, data: Partial<ServiceRecord>) => {
+    try {
+      await updateRecord(recordId, data)
+      toast.success('시술 기록이 수정되었습니다.')
+    } catch (error) {
+      toast.error('수정 실패. 다시 시도해주세요.')
+    }
+  }
+
+  const handleDeleteRecord = async (recordId: string) => {
+    try {
+      await deleteRecord(recordId)
+      toast.success('시술 기록이 삭제되었습니다.')
+    } catch (error) {
+      toast.error('삭제 실패. 다시 시도해주세요.')
+    }
+  }
 
   // 통계 계산
   const totalVisits = records.length
@@ -267,14 +548,22 @@ export default function CustomerDetail() {
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
       <div className="bg-white border-b border-gray-100 px-4 py-4 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/customers')}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <h1 className="text-xl font-bold text-gray-800">{customer.name}</h1>
+          </div>
           <button
-            onClick={() => navigate('/customers')}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            onClick={() => setEditCustomerModalOpen(true)}
+            className="p-2 text-gray-400 hover:text-violet-500 hover:bg-violet-50 rounded-xl transition"
           >
-            <ArrowLeft size={20} />
+            <Edit size={18} />
           </button>
-          <h1 className="text-xl font-bold text-gray-800">{customer.name}</h1>
         </div>
       </div>
 
@@ -333,10 +622,26 @@ export default function CustomerDetail() {
                   className={`px-4 py-3 ${idx !== 0 ? 'border-t border-gray-50' : ''}`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-gray-800">{record.menuName}</span>
-                    <span className="text-sm font-medium text-violet-500">
-                      {record.price.toLocaleString()}원
-                    </span>
+                    <div className="flex-1">
+                      <span className="text-sm font-semibold text-gray-800">{record.menuName}</span>
+                      {record.stylistName && (
+                        <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                          <UserIcon size={10} />
+                          {record.stylistName}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-violet-500">
+                        {record.price.toLocaleString()}원
+                      </span>
+                      <button
+                        onClick={() => setEditingRecord(record)}
+                        className="p-1.5 text-gray-400 hover:text-violet-500 hover:bg-violet-50 rounded-lg transition"
+                      >
+                        <Edit size={14} />
+                      </button>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-xs text-gray-400">
@@ -373,6 +678,15 @@ export default function CustomerDetail() {
         </div>
       </div>
 
+      {/* 고객 정보 수정 모달 */}
+      {editCustomerModalOpen && (
+        <EditCustomerModal
+          customer={customer}
+          onClose={() => setEditCustomerModalOpen(false)}
+          onSave={handleUpdateCustomer}
+        />
+      )}
+
       {/* 시술 기록 추가 모달 */}
       {modalOpen && (
         <AddRecordModal
@@ -382,6 +696,17 @@ export default function CustomerDetail() {
           onClose={() => setModalOpen(false)}
           onAdd={addRecord}
           onUpgradeClick={() => { setModalOpen(false); setUpgradeModalOpen(true) }}
+        />
+      )}
+
+      {/* 시술 기록 수정 모달 */}
+      {editingRecord && (
+        <EditRecordModal
+          record={editingRecord}
+          menus={menus}
+          onClose={() => setEditingRecord(null)}
+          onSave={handleUpdateRecord}
+          onDelete={handleDeleteRecord}
         />
       )}
 

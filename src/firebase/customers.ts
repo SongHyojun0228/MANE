@@ -58,3 +58,8 @@ export function subscribeCustomer(id: string, callback: (customer: Customer | nu
 export async function updateCustomerLastVisit(id: string, date: Date) {
   await updateDoc(doc(db, COLLECTION, id), { lastVisitDate: date })
 }
+
+/** 고객 정보 수정 */
+export async function updateCustomer(id: string, data: Partial<Pick<Customer, 'name' | 'phone' | 'memo'>>) {
+  await updateDoc(doc(db, COLLECTION, id), data)
+}

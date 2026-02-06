@@ -6,6 +6,7 @@ import {
   query,
   getDocs,
   deleteDoc,
+  updateDoc,
   doc,
   type DocumentSnapshot,
   type Unsubscribe,
@@ -68,6 +69,11 @@ export async function getRecordByReservationId(reservationId: string): Promise<S
   const snapshot = await getDocs(q)
   if (snapshot.empty) return null
   return toRecord(snapshot.docs[0])
+}
+
+/** 시술 기록 수정 */
+export async function updateRecord(recordId: string, data: Partial<ServiceRecord>) {
+  await updateDoc(doc(db, COLLECTION, recordId), data)
 }
 
 /** 시술 기록 삭제 */
