@@ -31,8 +31,8 @@
 
 📎 첨부 자료
 
-- 사용 가이드: [사용가이드](https://github.com/SongHyojun0228/MANE/blob/main/docs/BETA_GUIDE.md)
-- 피드백 양식: [구글폼 링크](https://forms.gle/y3ANVdRmrkxrXC4Z7)
+- 사용 가이드: https://github.com/SongHyojun0228/MANE/blob/main/docs/BETA_GUIDE.md
+- 피드백 양식: https://forms.gle/y3ANVdRmrkxrXC4Z7
 ```
 
 ### 버전 2: 상세 버전
@@ -59,7 +59,7 @@
 - 원하시는 기능 우선 개발
 
 📝 참여 방법:
-1. 웹사이트 접속: [MANE](https://mane-phi.vercel.app)
+1. 웹사이트 접속: https://mane-phi.vercel.app
 2. 회원가입 (이메일만 있으면 OK)
 3. 2~4주 정도 사용해보기
 4. 간단한 피드백 남기기
@@ -73,8 +73,8 @@
 
 📎 첨부 자료
 
-- 사용 가이드: [사용가이드](https://github.com/SongHyojun0228/MANE/blob/main/docs/BETA_GUIDE.md)
-- 피드백 양식: [구글폼 링크](https://forms.gle/y3ANVdRmrkxrXC4Z7)
+- 사용 가이드: https://github.com/SongHyojun0228/MANE/blob/main/docs/BETA_GUIDE.md
+- 피드백 양식: https://forms.gle/y3ANVdRmrkxrXC4Z7
 ```
 
 ---
@@ -137,7 +137,7 @@
 
 📝 참여 방법
 
-1. 웹사이트 접속: [MANE](https://mane-phi.vercel.app)
+1. 웹사이트 접속: https://mane-phi.vercel.app
 2. 이메일로 회원가입 (1분 소요)
 3. 2~4주 정도 사용
 4. 간단한 피드백 제출 (5분 소요)
@@ -146,8 +146,8 @@
 
 📎 첨부 자료
 
-- 사용 가이드: [사용가이드](https://github.com/SongHyojun0228/MANE/blob/main/docs/BETA_GUIDE.md)
-- 피드백 양식: [구글폼 링크](https://forms.gle/y3ANVdRmrkxrXC4Z7)
+- 사용 가이드: https://github.com/SongHyojun0228/MANE/blob/main/docs/BETA_GUIDE.md
+- 피드백 양식: https://forms.gle/y3ANVdRmrkxrXC4Z7
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -158,8 +158,8 @@
 감사합니다! 🙏
 
 [송효준]
-이메일: [thdgywns2300@gmail.com]
-카카오톡: [hyojun2300]
+이메일: thdgywns2300@gmail.com
+카카오톡: hyojun2300
 ```
 
 ---
