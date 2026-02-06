@@ -2,6 +2,8 @@
 
 이 템플릿을 참고하여 구글폼을 만들어주세요.
 
+[https://docs.google.com/forms/u/0/create?usp=forms_home&ths=true]
+
 ---
 
 ## 📋 기본 정보
