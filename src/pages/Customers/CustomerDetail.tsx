@@ -1,25 +1,34 @@
 import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, X, Phone, Loader2 } from 'lucide-react'
+import { ArrowLeft, Plus, X, Phone, Loader2, Image as ImageIcon, Crown } from 'lucide-react'
 import { format } from 'date-fns'
 import type { ServiceMenu, ServiceRecord } from '../../types'
 import { useCustomer } from '../../hooks/useCustomers'
 import { useRecords } from '../../hooks/useRecords'
 import { useServices } from '../../hooks/useServices'
+import { useAuth } from '../../context/AuthContext'
+import { usePlan } from '../../hooks/usePlan'
+import { uploadServicePhoto } from '../../firebase/storage'
+import UpgradeModal from '../../components/UpgradeModal'
 
 // --- 모달: 시술 기록 추가 ---
 interface AddRecordModalProps {
   customerId: string
   menus: ServiceMenu[]
+  isPremium: boolean
   onClose: () => void
-  onAdd: (record: Omit<ServiceRecord, 'id'>) => void
+  onAdd: (record: Omit<ServiceRecord, 'id'>) => Promise<void>
+  onUpgradeClick: () => void
 }
 
-function AddRecordModal({ customerId, menus, onClose, onAdd }: AddRecordModalProps) {
+function AddRecordModal({ customerId, menus, isPremium, onClose, onAdd, onUpgradeClick }: AddRecordModalProps) {
+  const { user } = useAuth()
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [menuId, setMenuId] = useState('')
   const [price, setPrice] = useState('')
   const [memo, setMemo] = useState('')
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [uploading, setUploading] = useState(false)
 
   const selectedMenu = menus.find((m) => m.id === menuId)
   const isValid = date && menuId && Number(price) > 0
@@ -31,19 +40,47 @@ function AddRecordModal({ customerId, menus, onClose, onAdd }: AddRecordModalPro
     if (menu) setPrice(String(menu.price))
   }
 
-  const handleSubmit = () => {
-    if (!isValid || !selectedMenu) return
-    // "2026-02-05" → 로컬 날짜로 파싱 (UTC 오프셋 방지)
-    const [year, month, day] = date.split('-').map(Number)
-    onAdd({
-      customerId,
-      menuId,
-      menuName: selectedMenu.name,
-      price: Number(price),
-      date: new Date(year, month - 1, day),
-      memo: memo.trim() || undefined,
-    })
-    onClose()
+  /** 사진 선택 */
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isPremium) { onUpgradeClick(); return }
+    const files = Array.from(e.target.files || [])
+    setSelectedFiles((prev) => [...prev, ...files].slice(0, 5)) // 최대 5장
+  }
+
+  /** 사진 제거 */
+  const removeFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const handleSubmit = async () => {
+    if (!isValid || !selectedMenu || !user) return
+    setUploading(true)
+    try {
+      // 사진 업로드
+      const photoUrls: string[] = []
+      for (const file of selectedFiles) {
+        const url = await uploadServicePhoto(user.uid, customerId, file)
+        photoUrls.push(url)
+      }
+
+      // 시술 기록 추가
+      const [year, month, day] = date.split('-').map(Number)
+      await onAdd({
+        customerId,
+        menuId,
+        menuName: selectedMenu.name,
+        price: Number(price),
+        date: new Date(year, month - 1, day),
+        memo: memo.trim() || undefined,
+        photos: photoUrls.length > 0 ? photoUrls : undefined,
+      })
+      onClose()
+    } catch (error) {
+      console.error('Failed to add record:', error)
+      alert('기록 추가 실패. 다시 시도해주세요.')
+    } finally {
+      setUploading(false)
+    }
   }
 
   return (
@@ -109,6 +146,59 @@ function AddRecordModal({ customerId, menus, onClose, onAdd }: AddRecordModalPro
             />
           </div>
 
+          {/* 사진 업로드 (프리미엄) */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-medium text-gray-600">시술 사진</label>
+              {!isPremium && (
+                <span className="flex items-center gap-1 text-xs text-violet-500">
+                  <Crown size={12} />
+                  프리미엄
+                </span>
+              )}
+            </div>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleFileSelect}
+              className="hidden"
+              id="photo-upload"
+              disabled={uploading}
+            />
+            <label
+              htmlFor="photo-upload"
+              className={`block w-full px-3 py-2.5 border-2 border-dashed rounded-xl text-sm text-center transition ${
+                isPremium
+                  ? 'border-gray-200 hover:border-violet-300 hover:bg-violet-50 cursor-pointer'
+                  : 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              <ImageIcon size={18} className="inline mr-1.5" />
+              {selectedFiles.length > 0 ? `${selectedFiles.length}장 선택됨` : '사진 추가 (최대 5장)'}
+            </label>
+            {selectedFiles.length > 0 && (
+              <div className="flex gap-2 mt-2 overflow-x-auto">
+                {selectedFiles.map((file, idx) => (
+                  <div key={idx} className="relative flex-shrink-0">
+                    <img
+                      src={URL.createObjectURL(file)}
+                      alt={`preview-${idx}`}
+                      className="w-16 h-16 object-cover rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeFile(idx)}
+                      className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-3 pt-2">
             <button
               type="button"
@@ -119,10 +209,11 @@ function AddRecordModal({ customerId, menus, onClose, onAdd }: AddRecordModalPro
             </button>
             <button
               type="submit"
-              disabled={!isValid}
-              className="flex-1 py-2.5 rounded-xl bg-violet-500 text-white text-sm font-medium disabled:opacity-40 hover:bg-violet-600 transition"
+              disabled={!isValid || uploading}
+              className="flex-1 py-2.5 rounded-xl bg-violet-500 text-white text-sm font-medium disabled:opacity-40 hover:bg-violet-600 transition flex items-center justify-center gap-2"
             >
-              추가
+              {uploading && <Loader2 size={16} className="animate-spin" />}
+              {uploading ? '업로드 중...' : '추가'}
             </button>
           </div>
         </form>
@@ -139,8 +230,10 @@ export default function CustomerDetail() {
   const { customer, loading: customerLoading } = useCustomer(id!)
   const { records, loading: recordsLoading, addRecord } = useRecords(id!)
   const { menus } = useServices()
+  const { plan } = usePlan()
 
   const [modalOpen, setModalOpen] = useState(false)
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
 
   // 통계 계산
   const totalVisits = records.length
@@ -253,6 +346,26 @@ export default function CustomerDetail() {
                       <span className="text-xs text-gray-400">· {record.memo}</span>
                     )}
                   </div>
+                  {/* 사진 썸네일 */}
+                  {record.photos && record.photos.length > 0 && (
+                    <div className="flex gap-2 mt-2 overflow-x-auto">
+                      {record.photos.map((url, idx) => (
+                        <a
+                          key={idx}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-shrink-0 block"
+                        >
+                          <img
+                            src={url}
+                            alt={`photo-${idx}`}
+                            className="w-16 h-16 object-cover rounded-lg border border-gray-200 hover:opacity-80 transition"
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -265,8 +378,19 @@ export default function CustomerDetail() {
         <AddRecordModal
           customerId={id!}
           menus={menus}
+          isPremium={plan === 'premium'}
           onClose={() => setModalOpen(false)}
           onAdd={addRecord}
+          onUpgradeClick={() => { setModalOpen(false); setUpgradeModalOpen(true) }}
+        />
+      )}
+
+      {/* 업그레이드 모달 */}
+      {upgradeModalOpen && (
+        <UpgradeModal
+          onClose={() => setUpgradeModalOpen(false)}
+          currentCount={0}
+          limit={10}
         />
       )}
     </div>

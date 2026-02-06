@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { sendPasswordResetEmail } from 'firebase/auth'
+import { auth } from '../../firebase/config'
 import { useAuth } from '../../context/AuthContext'
 
 /** Firebase 에러 코드 → 한국어 메시지 */
@@ -21,20 +23,40 @@ export default function Auth() {
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [passwordConfirm, setPasswordConfirm] = useState('')
+  const [name, setName] = useState('')
   const [error, setError] = useState('')
+  const [resetMsg, setResetMsg] = useState('')
   const [loading, setLoading] = useState(false)
   const { login, signup } = useAuth()
 
+  const handleResetPassword = async () => {
+    if (!email) { setError('이메일을 먼저 입력해주세요.'); return }
+    setError('')
+    setLoading(true)
+    try {
+      await sendPasswordResetEmail(auth, email)
+      setResetMsg('재설정 이메일을 보내드렸습니다. 받은편지함을 확인해주세요.')
+    } catch (e) {
+      setError(getErrorMessage(e))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleSubmit = async () => {
     setError('')
+    if (!isLogin) {
+      if (!name.trim()) { setError('사장님 성함을 입력해주세요.'); return }
+      if (password !== passwordConfirm) { setError('비밀번호가 일치하지 않습니다.'); return }
+    }
     setLoading(true)
     try {
       if (isLogin) {
         await login(email, password)
       } else {
-        await signup(email, password)
+        await signup(email, password, name.trim())
       }
-      // 성공 시 onAuthStateChanged 트리거 → AppRouter가 자동 전환
     } catch (e) {
       setError(getErrorMessage(e))
     } finally {
@@ -54,7 +76,7 @@ export default function Auth() {
         {/* 로그인 / 회원가입 탭 */}
         <div className="flex bg-white rounded-xl border border-gray-200 p-1 mb-5">
           <button
-            onClick={() => { setIsLogin(true); setError('') }}
+            onClick={() => { setIsLogin(true); setError(''); setResetMsg(''); setName(''); setPasswordConfirm('') }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
               isLogin ? 'bg-violet-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}
@@ -62,7 +84,7 @@ export default function Auth() {
             로그인
           </button>
           <button
-            onClick={() => { setIsLogin(false); setError('') }}
+            onClick={() => { setIsLogin(false); setError(''); setResetMsg(''); setName(''); setPasswordConfirm('') }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
               !isLogin ? 'bg-violet-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}
@@ -84,6 +106,18 @@ export default function Auth() {
               className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent transition"
             />
           </div>
+          {!isLogin && (
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1.5">사장님 성함</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="예: 김사장님"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent transition"
+              />
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1.5">비밀번호</label>
             <input
@@ -94,16 +128,45 @@ export default function Auth() {
               className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent transition"
             />
           </div>
+          {!isLogin && (
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1.5">비밀번호 확인</label>
+              <input
+                type="password"
+                value={passwordConfirm}
+                onChange={(e) => setPasswordConfirm(e.target.value)}
+                placeholder="비밀번호 다시 입력"
+                className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent transition ${
+                  passwordConfirm && password !== passwordConfirm ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                }`}
+              />
+            </div>
+          )}
 
           {/* 에러 메시지 */}
           {error && (
             <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
           )}
+          {/* 비밀번호 재설정 성공 메시지 */}
+          {resetMsg && (
+            <p className="text-xs text-green-600 bg-green-50 px-3 py-2 rounded-lg">{resetMsg}</p>
+          )}
+          {/* 비밀번호 재설정 링크 (로그인 모드에서만) */}
+          {isLogin && (
+            <button
+              type="button"
+              onClick={handleResetPassword}
+              disabled={loading}
+              className="text-xs text-violet-500 hover:text-violet-700 disabled:opacity-40 transition"
+            >
+              비밀번호 재설정
+            </button>
+          )}
 
           {/* 제출 버튼 */}
           <button
             onClick={handleSubmit}
-            disabled={!email || !password || loading}
+            disabled={!email || !password || loading || (!isLogin && (!name || !passwordConfirm))}
             className="w-full py-2.5 rounded-xl bg-violet-500 text-white text-sm font-semibold disabled:opacity-40 hover:bg-violet-600 transition flex items-center justify-center gap-2"
           >
             {loading && <Loader2 size={16} className="animate-spin" />}

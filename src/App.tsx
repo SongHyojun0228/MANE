@@ -8,6 +8,9 @@ import Customers from './pages/Customers/Customers'
 import CustomerDetail from './pages/Customers/CustomerDetail'
 import Services from './pages/Services/Services'
 import Stats from './pages/Stats/Stats'
+import Upgrade from './pages/Upgrade/Upgrade'
+import Landing from './pages/Landing/Landing'
+import Reservations from './pages/Reservations/Reservations'
 
 /** 로그인 상태로 라우팅 분기 */
 function AppRouter() {
@@ -21,10 +24,11 @@ function AppRouter() {
     )
   }
 
-  // 로그인 안 됨 → Auth 페이지만
+  // 로그인 안 됨 → 랜딩 페이지 or Auth
   if (!user) {
     return (
       <Routes>
+        <Route path="/" element={<Landing />} />
         <Route path="*" element={<Auth />} />
       </Routes>
     )
@@ -38,8 +42,10 @@ function AppRouter() {
         <Route path="/home" element={<Home />} />
         <Route path="/customers" element={<Customers />} />
         <Route path="/customers/:id" element={<CustomerDetail />} />
+        <Route path="/reservations" element={<Reservations />} />
         <Route path="/services" element={<Services />} />
         <Route path="/stats" element={<Stats />} />
+        <Route path="/upgrade" element={<Upgrade />} />
       </Route>
     </Routes>
   )

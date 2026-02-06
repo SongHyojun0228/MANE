@@ -7,12 +7,13 @@ import {
   type User,
 } from 'firebase/auth'
 import { auth } from '../firebase/config'
+import { createUserProfile } from '../firebase/users'
 
 interface AuthContextType {
   user: User | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
-  signup: (email: string, password: string) => Promise<void>
+  signup: (email: string, password: string, name: string) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -33,8 +34,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithEmailAndPassword(auth, email, password)
   }
 
-  const signup = async (email: string, password: string) => {
-    await createUserWithEmailAndPassword(auth, email, password)
+  const signup = async (email: string, password: string, name: string) => {
+    const { user: newUser } = await createUserWithEmailAndPassword(auth, email, password)
+    await createUserProfile(newUser.uid, { name })
   }
 
   const logout = async () => {

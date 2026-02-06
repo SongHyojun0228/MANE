@@ -4,6 +4,9 @@ import {
   onSnapshot,
   where,
   query,
+  getDocs,
+  deleteDoc,
+  doc,
   type DocumentSnapshot,
   type Unsubscribe,
 } from 'firebase/firestore'
@@ -23,6 +26,9 @@ function toRecord(docSnap: DocumentSnapshot): ServiceRecord {
     price: data.price,
     date: data.date?.toDate() ?? new Date(),
     memo: data.memo || undefined,
+    reservationId: data.reservationId || undefined,
+    stylistId: data.stylistId || undefined,
+    stylistName: data.stylistName || undefined,
   }
 }
 
@@ -54,4 +60,17 @@ export function subscribeRecordsByCustomer(
     records.sort((a, b) => b.date.getTime() - a.date.getTime())
     callback(records)
   })
+}
+
+/** 예약 ID로 시술 기록 조회 (중복 생성 방지용) */
+export async function getRecordByReservationId(reservationId: string): Promise<ServiceRecord | null> {
+  const q = query(collection(db, COLLECTION), where('reservationId', '==', reservationId))
+  const snapshot = await getDocs(q)
+  if (snapshot.empty) return null
+  return toRecord(snapshot.docs[0])
+}
+
+/** 시술 기록 삭제 */
+export async function deleteRecord(recordId: string) {
+  await deleteDoc(doc(db, COLLECTION, recordId))
 }

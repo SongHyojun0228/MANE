@@ -21,17 +21,23 @@ function toMenu(docSnap: DocumentSnapshot): ServiceMenu {
     id: docSnap.id,
     name: data.name,
     price: data.price,
+    stylistIds: data.stylistIds,
   }
 }
 
 /** 메뉴 추가 (사용자별) */
 export async function addMenu(data: Omit<ServiceMenu, 'id'>, userId: string) {
-  const docRef = await addDoc(collection(db, COLLECTION), { ...data, userId })
+  // undefined 필드 제거 (Firebase는 undefined를 허용하지 않음)
+  const cleanData = Object.fromEntries(
+    Object.entries({ ...data, userId }).filter(([_, v]) => v !== undefined)
+  )
+  const docRef = await addDoc(collection(db, COLLECTION), cleanData)
   return docRef.id
 }
 
 export async function updateMenu(id: string, data: Omit<ServiceMenu, 'id'>) {
-  await updateDoc(doc(db, COLLECTION, id), data)
+  const cleanData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined))
+  await updateDoc(doc(db, COLLECTION, id), cleanData)
 }
 
 export async function deleteMenu(id: string) {
