@@ -319,26 +319,53 @@ function EditCustomerModal({ customer, onClose, onSave }: EditCustomerModalProps
 // --- 모달: 시술 기록 수정 ---
 interface EditRecordModalProps {
   record: ServiceRecord
+  customerId: string
   menus: ServiceMenu[]
   onClose: () => void
   onSave: (id: string, data: Partial<ServiceRecord>) => Promise<void>
   onDelete: (id: string) => Promise<void>
 }
 
-function EditRecordModal({ record, menus, onClose, onSave, onDelete }: EditRecordModalProps) {
+function EditRecordModal({ record, customerId, menus, onClose, onSave, onDelete }: EditRecordModalProps) {
+  const { user } = useAuth()
   const [date, setDate] = useState(format(record.date, 'yyyy-MM-dd'))
   const [menuId, setMenuId] = useState(record.menuId)
   const [price, setPrice] = useState(String(record.price))
   const [memo, setMemo] = useState(record.memo || '')
+  const [existingPhotos, setExistingPhotos] = useState<string[]>(record.photos || [])
+  const [newFiles, setNewFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const selectedMenu = menus.find((m) => m.id === menuId)
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    setNewFiles((prev) => [...prev, ...files].slice(0, 5 - existingPhotos.length))
+  }
+
+  const removeExistingPhoto = (index: number) => {
+    setExistingPhotos((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const removeNewFile = (index: number) => {
+    setNewFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
   const handleSubmit = async () => {
-    if (!menuId || Number(price) <= 0 || !selectedMenu) return
+    if (!menuId || Number(price) <= 0 || !selectedMenu || !user) return
     setSaving(true)
     try {
+      // 새 사진 업로드
+      const uploadedUrls: string[] = []
+      for (const file of newFiles) {
+        const url = await uploadServicePhoto(user.uid, customerId, file)
+        uploadedUrls.push(url)
+      }
+
+      // 기존 사진 + 새 사진 합치기
+      const allPhotos = [...existingPhotos, ...uploadedUrls]
+
       const [year, month, day] = date.split('-').map(Number)
       await onSave(record.id, {
         menuId,
@@ -346,8 +373,12 @@ function EditRecordModal({ record, menus, onClose, onSave, onDelete }: EditRecor
         price: Number(price),
         date: new Date(year, month - 1, day),
         memo: memo.trim() || undefined,
+        photos: allPhotos.length > 0 ? allPhotos : undefined,
       })
       onClose()
+    } catch (error) {
+      console.error('Failed to update record:', error)
+      alert('수정 실패. 다시 시도해주세요.')
     } finally {
       setSaving(false)
     }
@@ -440,6 +471,72 @@ function EditRecordModal({ record, menus, onClose, onSave, onDelete }: EditRecor
                 rows={2}
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-violet-400"
               />
+            </div>
+
+            {/* 사진 관리 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                사진 ({existingPhotos.length + newFiles.length}/5)
+              </label>
+
+              {/* 기존 사진 */}
+              {existingPhotos.length > 0 && (
+                <div className="flex gap-2 mb-2 overflow-x-auto">
+                  {existingPhotos.map((url, idx) => (
+                    <div key={idx} className="relative flex-shrink-0">
+                      <img
+                        src={url}
+                        alt={`photo-${idx}`}
+                        className="w-20 h-20 object-cover rounded-lg border border-gray-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeExistingPhoto(idx)}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 새 사진 미리보기 */}
+              {newFiles.length > 0 && (
+                <div className="flex gap-2 mb-2 overflow-x-auto">
+                  {newFiles.map((file, idx) => (
+                    <div key={idx} className="relative flex-shrink-0">
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={`new-${idx}`}
+                        className="w-20 h-20 object-cover rounded-lg border-2 border-violet-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeNewFile(idx)}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 사진 추가 버튼 */}
+              {existingPhotos.length + newFiles.length < 5 && (
+                <label className="flex items-center justify-center gap-2 w-full py-2.5 border-2 border-dashed border-gray-300 rounded-xl text-sm text-gray-500 hover:border-violet-400 hover:text-violet-500 cursor-pointer transition">
+                  <ImageIcon size={16} />
+                  사진 추가
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </label>
+              )}
             </div>
 
             <div className="flex gap-3 pt-2">
@@ -703,6 +800,7 @@ export default function CustomerDetail() {
       {editingRecord && (
         <EditRecordModal
           record={editingRecord}
+          customerId={id!}
           menus={menus}
           onClose={() => setEditingRecord(null)}
           onSave={handleUpdateRecord}
