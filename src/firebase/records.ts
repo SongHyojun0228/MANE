@@ -27,6 +27,7 @@ function toRecord(docSnap: DocumentSnapshot): ServiceRecord {
     price: data.price,
     date: data.date?.toDate() ?? new Date(),
     memo: data.memo || undefined,
+    photos: data.photos || undefined,
     reservationId: data.reservationId || undefined,
     stylistId: data.stylistId || undefined,
     stylistName: data.stylistName || undefined,
