@@ -2,7 +2,7 @@
 
 이 템플릿을 참고하여 구글폼을 만들어주세요.
 
-[https://docs.google.com/forms/u/0/create?usp=forms_home&ths=true]
+https://docs.google.com/forms/d/1hxc5HqMlWTvYifQU1imycLUAxYkqu-olY1jfF1UkKE8/edit
 
 ---
 
