@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Home, Users, Scissors, BarChart2, Calendar } from 'lucide-react'
+import { Home, Users, Scissors, BarChart2, Calendar, Settings as SettingsIcon } from 'lucide-react'
 
 const NAV_ITEMS = [
   { path: '/home',         label: '홈',   icon: Home },
@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { path: '/reservations', label: '예약', icon: Calendar },
   { path: '/services',     label: '시술', icon: Scissors },
   { path: '/stats',        label: '통계', icon: BarChart2 },
+  { path: '/settings',     label: '설정', icon: SettingsIcon },
 ]
 
 export default function BottomNav() {

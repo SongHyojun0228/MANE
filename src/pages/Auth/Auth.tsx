@@ -3,21 +3,8 @@ import { Loader2 } from 'lucide-react'
 import { sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '../../firebase/config'
 import { useAuth } from '../../context/AuthContext'
-
-/** Firebase 에러 코드 → 한국어 메시지 */
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error && 'code' in error) {
-    switch (error.code) {
-      case 'auth/email-already-in-use':  return '이미 사용 중인 이메일입니다.'
-      case 'auth/invalid-email':         return '올바르지 않은 이메일 형식입니다.'
-      case 'auth/weak-password':         return '비밀번호는 6자리 이상이어야 합니다.'
-      case 'auth/user-not-found':        return '등록되지 않은 이메일입니다.'
-      case 'auth/wrong-password':        return '비밀번호가 틀렸습니다.'
-      case 'auth/invalid-credential':    return '이메일 또는 비밀번호가 잘못되었습니다.'
-    }
-  }
-  return '오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
-}
+import { useToast } from '../../context/ToastContext'
+import { getFirebaseErrorMessage } from '../../utils/errorMessages'
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true)
@@ -25,40 +12,48 @@ export default function Auth() {
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [name, setName] = useState('')
-  const [error, setError] = useState('')
-  const [resetMsg, setResetMsg] = useState('')
   const [loading, setLoading] = useState(false)
   const { login, signup } = useAuth()
+  const toast = useToast()
 
   const handleResetPassword = async () => {
-    if (!email) { setError('이메일을 먼저 입력해주세요.'); return }
-    setError('')
+    if (!email) {
+      toast.error('이메일을 먼저 입력해주세요.')
+      return
+    }
     setLoading(true)
     try {
       await sendPasswordResetEmail(auth, email)
-      setResetMsg('재설정 이메일을 보내드렸습니다. 받은편지함을 확인해주세요.')
+      toast.success('재설정 이메일을 보내드렸습니다. 받은편지함을 확인해주세요.')
     } catch (e) {
-      setError(getErrorMessage(e))
+      toast.error(getFirebaseErrorMessage(e))
     } finally {
       setLoading(false)
     }
   }
 
   const handleSubmit = async () => {
-    setError('')
     if (!isLogin) {
-      if (!name.trim()) { setError('사장님 성함을 입력해주세요.'); return }
-      if (password !== passwordConfirm) { setError('비밀번호가 일치하지 않습니다.'); return }
+      if (!name.trim()) {
+        toast.error('사장님 성함을 입력해주세요.')
+        return
+      }
+      if (password !== passwordConfirm) {
+        toast.error('비밀번호가 일치하지 않습니다.')
+        return
+      }
     }
     setLoading(true)
     try {
       if (isLogin) {
         await login(email, password)
+        toast.success('로그인되었습니다!')
       } else {
         await signup(email, password, name.trim())
+        toast.success('회원가입이 완료되었습니다!')
       }
     } catch (e) {
-      setError(getErrorMessage(e))
+      toast.error(getFirebaseErrorMessage(e))
     } finally {
       setLoading(false)
     }
@@ -76,7 +71,7 @@ export default function Auth() {
         {/* 로그인 / 회원가입 탭 */}
         <div className="flex bg-white rounded-xl border border-gray-200 p-1 mb-5">
           <button
-            onClick={() => { setIsLogin(true); setError(''); setResetMsg(''); setName(''); setPasswordConfirm('') }}
+            onClick={() => { setIsLogin(true); setName(''); setPasswordConfirm('') }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
               isLogin ? 'bg-violet-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}
@@ -84,7 +79,7 @@ export default function Auth() {
             로그인
           </button>
           <button
-            onClick={() => { setIsLogin(false); setError(''); setResetMsg(''); setName(''); setPasswordConfirm('') }}
+            onClick={() => { setIsLogin(false); setName(''); setPasswordConfirm('') }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
               !isLogin ? 'bg-violet-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}
@@ -143,14 +138,6 @@ export default function Auth() {
             </div>
           )}
 
-          {/* 에러 메시지 */}
-          {error && (
-            <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
-          )}
-          {/* 비밀번호 재설정 성공 메시지 */}
-          {resetMsg && (
-            <p className="text-xs text-green-600 bg-green-50 px-3 py-2 rounded-lg">{resetMsg}</p>
-          )}
           {/* 비밀번호 재설정 링크 (로그인 모드에서만) */}
           {isLogin && (
             <button

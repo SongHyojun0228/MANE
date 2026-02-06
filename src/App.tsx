@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { ToastProvider } from './context/ToastContext'
 import Layout from './components/Layout'
 import Auth from './pages/Auth/Auth'
 import Home from './pages/Home/Home'
@@ -11,6 +12,7 @@ import Stats from './pages/Stats/Stats'
 import Upgrade from './pages/Upgrade/Upgrade'
 import Landing from './pages/Landing/Landing'
 import Reservations from './pages/Reservations/Reservations'
+import Settings from './pages/Settings/Settings'
 
 /** 로그인 상태로 라우팅 분기 */
 function AppRouter() {
@@ -45,6 +47,7 @@ function AppRouter() {
         <Route path="/reservations" element={<Reservations />} />
         <Route path="/services" element={<Services />} />
         <Route path="/stats" element={<Stats />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/upgrade" element={<Upgrade />} />
       </Route>
     </Routes>
@@ -55,7 +58,9 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRouter />
+        <ToastProvider>
+          <AppRouter />
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   )

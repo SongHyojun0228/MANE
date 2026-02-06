@@ -7,6 +7,12 @@ export async function uploadServicePhoto(
   customerId: string,
   file: File
 ): Promise<string> {
+  // 파일 크기 체크 (5MB 제한)
+  const MAX_SIZE = 5 * 1024 * 1024 // 5MB
+  if (file.size > MAX_SIZE) {
+    throw new Error('IMAGE_SIZE_EXCEEDED')
+  }
+
   const timestamp = Date.now()
   const fileName = `${timestamp}_${file.name}`
   const storageRef = ref(storage, `users/${userId}/customers/${customerId}/${fileName}`)
